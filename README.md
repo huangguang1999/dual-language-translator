@@ -9,7 +9,7 @@
 - 一键交换语言与文本
 - 一键复制和清空
 - 适配桌面与移动端
-- 输入限制为 500 UTF-8 bytes，与 MyMemory API 的单次请求限制一致
+- 输入限制为 500 UTF-8 bytes，避免频繁提交过长文本
 
 ## 本地运行
 
@@ -27,9 +27,9 @@ npm run check
 ## 技术实现
 
 - React 19 + TypeScript + Vite
-- 翻译服务：[MyMemory REST API](https://mymemory.translated.net/doc/spec.php)
+- 翻译服务：[Google Translate](https://translate.google.com/)
 - 部署平台：GitHub Pages
 
 ## 隐私说明
 
-输入内容会发送给 MyMemory 完成翻译，请勿输入密码、密钥或其他敏感信息。
+输入内容会发送给 Google Translate 完成翻译，请勿输入密码、密钥或其他敏感信息。

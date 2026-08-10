@@ -2,38 +2,23 @@ import type { LanguageCode } from './languages'
 
 export const MAX_SOURCE_BYTES = 500
 
-const TRANSLATION_ENDPOINT = 'https://api.mymemory.translated.net/get'
+const TRANSLATION_ENDPOINT = 'https://translate.googleapis.com/translate_a/single'
 const textEncoder = new TextEncoder()
 
-type JsonRecord = Record<string, unknown>
-
-function isJsonRecord(value: unknown): value is JsonRecord {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function readTranslatedText(payload: unknown): string {
-  if (!isJsonRecord(payload)) {
+export function parseTranslationResponse(payload: unknown): string {
+  if (!Array.isArray(payload) || !Array.isArray(payload[0])) {
     throw new Error('翻译服务返回了无法识别的数据。')
   }
 
-  const status = Number(payload.responseStatus)
-  if (!Number.isNaN(status) && status >= 400) {
-    const details = typeof payload.responseDetails === 'string' ? payload.responseDetails : ''
-    throw new Error(details || '翻译服务暂时不可用，请稍后重试。')
-  }
+  const translatedText = payload[0]
+    .map((segment) => (Array.isArray(segment) && typeof segment[0] === 'string' ? segment[0] : ''))
+    .join('')
 
-  const responseData = payload.responseData
-  if (!isJsonRecord(responseData) || typeof responseData.translatedText !== 'string') {
+  if (!translatedText) {
     throw new Error('翻译服务没有返回翻译结果。')
   }
 
-  return responseData.translatedText
-}
-
-function decodeHtmlEntities(value: string): string {
-  const textArea = document.createElement('textarea')
-  textArea.innerHTML = value
-  return textArea.value
+  return translatedText
 }
 
 export function getUtf8ByteLength(value: string): number {
@@ -69,9 +54,11 @@ export async function translateText(
   }
 
   const url = new URL(TRANSLATION_ENDPOINT)
+  url.searchParams.set('client', 'gtx')
+  url.searchParams.set('sl', sourceLanguage)
+  url.searchParams.set('tl', targetLanguage)
+  url.searchParams.set('dt', 't')
   url.searchParams.set('q', text)
-  url.searchParams.set('langpair', `${sourceLanguage}|${targetLanguage}`)
-  url.searchParams.set('mt', '1')
 
   let response: Response
   try {
@@ -88,5 +75,5 @@ export async function translateText(
   }
 
   const payload: unknown = await response.json()
-  return decodeHtmlEntities(readTranslatedText(payload))
+  return parseTranslationResponse(payload)
 }

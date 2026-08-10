@@ -16,6 +16,10 @@ import {
 
 type PanelSide = 'left' | 'right'
 
+type LanguageFlow =
+  | { step: 'selecting'; leftLanguage: LanguageCode; rightLanguage: LanguageCode }
+  | { step: 'translating'; leftLanguage: LanguageCode; rightLanguage: LanguageCode }
+
 type TranslationJob = {
   id: number
   sourceSide: PanelSide
@@ -58,15 +62,127 @@ function TrashIcon() {
   )
 }
 
+function EditIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="m14 5 5 5M4 20l3.5-.7L19 7.8a2.1 2.1 0 0 0-3-3L4.7 16.3 4 20Z" />
+    </svg>
+  )
+}
+
+type LanguageSetupProps = {
+  leftLanguage: LanguageCode
+  rightLanguage: LanguageCode
+  onLeftLanguageChange: (language: LanguageCode) => void
+  onRightLanguageChange: (language: LanguageCode) => void
+  onSwap: () => void
+  onStart: () => void
+}
+
+function LanguageSetup({
+  leftLanguage,
+  rightLanguage,
+  onLeftLanguageChange,
+  onRightLanguageChange,
+  onSwap,
+  onStart,
+}: LanguageSetupProps) {
+  const leftLanguageDetails = getLanguage(leftLanguage)
+  const rightLanguageDetails = getLanguage(rightLanguage)
+
+  return (
+    <div className="setup-card">
+      <div className="setup-progress" aria-label="当前是第 1 步，共 2 步">
+        <span className="is-current">1</span>
+        <i />
+        <span>2</span>
+      </div>
+
+      <div className="setup-heading">
+        <span className="panel-eyebrow">第 1 步</span>
+        <h2>选择需要互译的两种语言</h2>
+        <p>完成选择后，两边都可以输入，系统会自动翻译到另一边。</p>
+      </div>
+
+      <div className="language-choice-grid">
+        <label className="language-choice">
+          <span className="choice-label">语言 A</span>
+          <span className="choice-content">
+            <span className="choice-code">{leftLanguageDetails.shortCode}</span>
+            <select
+              value={leftLanguage}
+              onChange={(event) => onLeftLanguageChange(event.target.value as LanguageCode)}
+              aria-label="选择语言 A"
+            >
+              {LANGUAGES.map((language) => (
+                <option
+                  key={language.code}
+                  value={language.code}
+                  disabled={language.code === rightLanguage}
+                >
+                  {language.label}
+                </option>
+              ))}
+            </select>
+          </span>
+        </label>
+
+        <button
+          type="button"
+          className="setup-swap-button"
+          onClick={onSwap}
+          aria-label="交换已选择的两种语言"
+          title="交换语言"
+        >
+          <SwapIcon />
+        </button>
+
+        <label className="language-choice">
+          <span className="choice-label">语言 B</span>
+          <span className="choice-content">
+            <span className="choice-code">{rightLanguageDetails.shortCode}</span>
+            <select
+              value={rightLanguage}
+              onChange={(event) => onRightLanguageChange(event.target.value as LanguageCode)}
+              aria-label="选择语言 B"
+            >
+              {LANGUAGES.map((language) => (
+                <option
+                  key={language.code}
+                  value={language.code}
+                  disabled={language.code === leftLanguage}
+                >
+                  {language.label}
+                </option>
+              ))}
+            </select>
+          </span>
+        </label>
+      </div>
+
+      <div className="setup-summary">
+        <span>即将开启</span>
+        <strong>
+          {leftLanguageDetails.label} ↔ {rightLanguageDetails.label}
+        </strong>
+      </div>
+
+      <button type="button" className="start-button" onClick={onStart}>
+        开始双向翻译
+        <span aria-hidden="true">→</span>
+      </button>
+    </div>
+  )
+}
+
 type LanguagePanelProps = {
   side: PanelSide
   language: LanguageCode
-  oppositeLanguage: LanguageCode
   value: string
   isActive: boolean
-  isTranslating: boolean
+  isSourceTranslating: boolean
+  showTargetProgress: boolean
   copied: boolean
-  onLanguageChange: (language: LanguageCode) => void
   onTextChange: (value: string) => void
   onCopy: () => void
 }
@@ -74,19 +190,17 @@ type LanguagePanelProps = {
 function LanguagePanel({
   side,
   language,
-  oppositeLanguage,
   value,
   isActive,
-  isTranslating,
+  isSourceTranslating,
+  showTargetProgress,
   copied,
-  onLanguageChange,
   onTextChange,
   onCopy,
 }: LanguagePanelProps) {
   const languageDetails = getLanguage(language)
   const isLeft = side === 'left'
-  const panelTitle = isLeft ? '左侧语言' : '右侧语言'
-  const placeholder = isLeft ? '在这里输入文字…' : '也可以从这里开始输入…'
+  const panelTitle = isLeft ? '语言 A' : '语言 B'
 
   return (
     <section
@@ -96,28 +210,13 @@ function LanguagePanel({
       <div className="language-toolbar">
         <div>
           <span className="panel-eyebrow">{panelTitle}</span>
-          <label className="language-select-wrap">
-            <span className="sr-only">选择{panelTitle}</span>
+          <div className="panel-language-name">
             <span className="language-short-code">{languageDetails.shortCode}</span>
-            <select
-              value={language}
-              onChange={(event) => onLanguageChange(event.target.value as LanguageCode)}
-              aria-label={`选择${panelTitle}`}
-            >
-              {LANGUAGES.map((option) => (
-                <option
-                  key={option.code}
-                  value={option.code}
-                  disabled={option.code === oppositeLanguage}
-                >
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
+            <strong>{languageDetails.label}</strong>
+          </div>
         </div>
         <span className={`input-badge ${isActive ? 'is-visible' : ''}`}>
-          {isTranslating ? '正在翻译' : '当前输入端'}
+          {isSourceTranslating ? '正在翻译' : '当前输入端'}
         </span>
       </div>
 
@@ -125,12 +224,12 @@ function LanguagePanel({
         <textarea
           value={value}
           onChange={(event) => onTextChange(event.target.value)}
-          placeholder={placeholder}
+          placeholder={`输入${languageDetails.label}…`}
           aria-label={`${languageDetails.label}文本`}
           dir="auto"
           spellCheck
         />
-        {isTranslating && !isActive ? <div className="translation-shimmer" /> : null}
+        {showTargetProgress ? <div className="translation-shimmer" /> : null}
       </div>
 
       <div className="panel-footer">
@@ -153,8 +252,11 @@ function LanguagePanel({
 }
 
 function App() {
-  const [leftLanguage, setLeftLanguage] = useState<LanguageCode>(DEFAULT_LEFT_LANGUAGE)
-  const [rightLanguage, setRightLanguage] = useState<LanguageCode>(DEFAULT_RIGHT_LANGUAGE)
+  const [languageFlow, setLanguageFlow] = useState<LanguageFlow>({
+    step: 'selecting',
+    leftLanguage: DEFAULT_LEFT_LANGUAGE,
+    rightLanguage: DEFAULT_RIGHT_LANGUAGE,
+  })
   const [leftText, setLeftText] = useState('')
   const [rightText, setRightText] = useState('')
   const [activeSide, setActiveSide] = useState<PanelSide>('left')
@@ -164,6 +266,8 @@ function App() {
   const nextJobId = useRef(0)
   const latestJobId = useRef(0)
   const copyResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const { leftLanguage, rightLanguage } = languageFlow
 
   useEffect(() => {
     if (!translationJob) {
@@ -217,12 +321,17 @@ function App() {
     }
   }, [])
 
-  function queueTranslation(
-    sourceSide: PanelSide,
-    sourceText: string,
-    nextLeftLanguage = leftLanguage,
-    nextRightLanguage = rightLanguage,
-  ) {
+  function resetTranslation() {
+    latestJobId.current = ++nextJobId.current
+    setLeftText('')
+    setRightText('')
+    setActiveSide('left')
+    setTranslationJob(null)
+    setTranslationStatus({ state: 'idle' })
+    setCopiedSide(null)
+  }
+
+  function queueTranslation(sourceSide: PanelSide, sourceText: string) {
     if (!sourceText.trim()) {
       latestJobId.current = ++nextJobId.current
       setTranslationJob(null)
@@ -242,12 +351,54 @@ function App() {
       id,
       sourceSide,
       sourceText,
-      sourceLanguage: sourceSide === 'left' ? nextLeftLanguage : nextRightLanguage,
-      targetLanguage: sourceSide === 'left' ? nextRightLanguage : nextLeftLanguage,
+      sourceLanguage: sourceSide === 'left' ? leftLanguage : rightLanguage,
+      targetLanguage: sourceSide === 'left' ? rightLanguage : leftLanguage,
     })
   }
 
+  function handleSetupLanguageChange(side: PanelSide, language: LanguageCode) {
+    if (languageFlow.step !== 'selecting') {
+      return
+    }
+
+    setLanguageFlow({
+      ...languageFlow,
+      leftLanguage: side === 'left' ? language : languageFlow.leftLanguage,
+      rightLanguage: side === 'right' ? language : languageFlow.rightLanguage,
+    })
+  }
+
+  function handleSetupSwap() {
+    if (languageFlow.step !== 'selecting') {
+      return
+    }
+
+    setLanguageFlow({
+      step: 'selecting',
+      leftLanguage: languageFlow.rightLanguage,
+      rightLanguage: languageFlow.leftLanguage,
+    })
+  }
+
+  function handleStartTranslation() {
+    if (languageFlow.step !== 'selecting' || leftLanguage === rightLanguage) {
+      return
+    }
+
+    resetTranslation()
+    setLanguageFlow({ step: 'translating', leftLanguage, rightLanguage })
+  }
+
+  function handleReselectLanguages() {
+    resetTranslation()
+    setLanguageFlow({ step: 'selecting', leftLanguage, rightLanguage })
+  }
+
   function handleTextChange(side: PanelSide, rawValue: string) {
+    if (languageFlow.step !== 'translating') {
+      return
+    }
+
     const value = trimToUtf8ByteLimit(rawValue, MAX_SOURCE_BYTES)
     setActiveSide(side)
 
@@ -259,25 +410,17 @@ function App() {
     queueTranslation(side, value)
   }
 
-  function handleLanguageChange(side: PanelSide, language: LanguageCode) {
-    const nextLeftLanguage = side === 'left' ? language : leftLanguage
-    const nextRightLanguage = side === 'right' ? language : rightLanguage
-
-    if (nextLeftLanguage === nextRightLanguage) {
+  function handleWorkspaceSwap() {
+    if (languageFlow.step !== 'translating') {
       return
     }
 
-    setLeftLanguage(nextLeftLanguage)
-    setRightLanguage(nextRightLanguage)
-
-    const sourceText = activeSide === 'left' ? leftText : rightText
-    queueTranslation(activeSide, sourceText, nextLeftLanguage, nextRightLanguage)
-  }
-
-  function handleSwap() {
     latestJobId.current = ++nextJobId.current
-    setLeftLanguage(rightLanguage)
-    setRightLanguage(leftLanguage)
+    setLanguageFlow({
+      step: 'translating',
+      leftLanguage: rightLanguage,
+      rightLanguage: leftLanguage,
+    })
     setLeftText(rightText)
     setRightText(leftText)
     setActiveSide(activeSide === 'left' ? 'right' : 'left')
@@ -286,11 +429,7 @@ function App() {
   }
 
   function handleClear() {
-    latestJobId.current = ++nextJobId.current
-    setLeftText('')
-    setRightText('')
-    setTranslationJob(null)
-    setTranslationStatus({ state: 'idle' })
+    resetTranslation()
   }
 
   async function handleCopy(side: PanelSide) {
@@ -316,98 +455,142 @@ function App() {
   const statusSourceSide = 'sourceSide' in translationStatus ? translationStatus.sourceSide : null
   const sourceLanguage = getLanguage(activeSide === 'left' ? leftLanguage : rightLanguage)
   const targetLanguage = getLanguage(activeSide === 'left' ? rightLanguage : leftLanguage)
+  const leftLanguageDetails = getLanguage(leftLanguage)
+  const rightLanguageDetails = getLanguage(rightLanguage)
 
   return (
     <div className="app-shell">
       <header className="site-header">
-        <a className="brand" href="./" aria-label="Dualingo 首页">
+        <button
+          type="button"
+          className="brand"
+          onClick={handleReselectLanguages}
+          aria-label="Dualingo 首页"
+        >
           <span className="brand-mark" aria-hidden="true">
             <span>文</span>
             <span>A</span>
           </span>
           <span>Dualingo</span>
-        </a>
-        <span className="header-caption">双向即时翻译</span>
+        </button>
+        <span className="header-caption">
+          {languageFlow.step === 'selecting' ? '先选择语言' : '双向即时翻译'}
+        </span>
       </header>
 
       <main>
-        <div className="intro">
-          <span className="intro-pill">双向同步</span>
-          <h1>从任意一侧开始输入</h1>
-          <p>选择两种语言，左边和右边都能作为输入端，另一侧会自动更新翻译。</p>
-        </div>
-
-        <div className="translator-card">
-          <div className="translator-grid">
-            <LanguagePanel
-              side="left"
-              language={leftLanguage}
-              oppositeLanguage={rightLanguage}
-              value={leftText}
-              isActive={activeSide === 'left'}
-              isTranslating={isTranslating && statusSourceSide === 'left'}
-              copied={copiedSide === 'left'}
-              onLanguageChange={(language) => handleLanguageChange('left', language)}
-              onTextChange={(value) => handleTextChange('left', value)}
-              onCopy={() => void handleCopy('left')}
+        {languageFlow.step === 'selecting' ? (
+          <>
+            <div className="intro setup-intro">
+              <span className="intro-pill">先选语言，再开始</span>
+              <h1>你想翻译哪两种语言？</h1>
+              <p>先确定语言组合，下一步即可从任意一边输入并自动翻译。</p>
+            </div>
+            <LanguageSetup
+              leftLanguage={leftLanguage}
+              rightLanguage={rightLanguage}
+              onLeftLanguageChange={(language) => handleSetupLanguageChange('left', language)}
+              onRightLanguageChange={(language) => handleSetupLanguageChange('right', language)}
+              onSwap={handleSetupSwap}
+              onStart={handleStartTranslation}
             />
-
-            <div className="middle-actions">
-              <button
-                type="button"
-                className="swap-button"
-                onClick={handleSwap}
-                aria-label="交换两侧语言和文字"
-                title="交换语言"
-              >
-                <SwapIcon />
-              </button>
-              <span className="swap-label">交换</span>
+          </>
+        ) : (
+          <>
+            <div className="intro workspace-intro">
+              <span className="intro-pill">
+                {leftLanguageDetails.label} ↔ {rightLanguageDetails.label}
+              </span>
+              <h1>任意一边输入，另一边自动翻译</h1>
+              <p>两侧都是输入框；系统会以你最后输入的一侧作为原文。</p>
             </div>
 
-            <LanguagePanel
-              side="right"
-              language={rightLanguage}
-              oppositeLanguage={leftLanguage}
-              value={rightText}
-              isActive={activeSide === 'right'}
-              isTranslating={isTranslating && statusSourceSide === 'right'}
-              copied={copiedSide === 'right'}
-              onLanguageChange={(language) => handleLanguageChange('right', language)}
-              onTextChange={(value) => handleTextChange('right', value)}
-              onCopy={() => void handleCopy('right')}
-            />
-          </div>
+            <div className="translator-card">
+              <div className="workspace-header">
+                <div className="workspace-language-pair">
+                  <span>当前语言组合</span>
+                  <strong>
+                    {leftLanguageDetails.label}
+                    <i>↔</i>
+                    {rightLanguageDetails.label}
+                  </strong>
+                </div>
+                <button type="button" className="edit-languages-button" onClick={handleReselectLanguages}>
+                  <EditIcon />
+                  重新选择语言
+                </button>
+              </div>
 
-          <div className="translator-status" aria-live="polite">
-            <div className="status-message">
-              <span className={`status-dot ${isTranslating ? 'is-pulsing' : ''}`} />
-              {translationStatus.state === 'error' ? (
-                <span className="error-message">{translationStatus.message}</span>
-              ) : isTranslating ? (
-                <span>
-                  正在将{sourceLanguage.label}翻译为{targetLanguage.label}…
-                </span>
-              ) : (
-                <span>输入后约 0.5 秒自动翻译</span>
-              )}
+              <div className="translator-grid">
+                <LanguagePanel
+                  side="left"
+                  language={leftLanguage}
+                  value={leftText}
+                  isActive={activeSide === 'left'}
+                  isSourceTranslating={isTranslating && statusSourceSide === 'left'}
+                  showTargetProgress={isTranslating && statusSourceSide === 'right'}
+                  copied={copiedSide === 'left'}
+                  onTextChange={(value) => handleTextChange('left', value)}
+                  onCopy={() => void handleCopy('left')}
+                />
+
+                <div className="middle-actions">
+                  <button
+                    type="button"
+                    className="swap-button"
+                    onClick={handleWorkspaceSwap}
+                    aria-label="交换两侧语言和文字"
+                    title="交换语言"
+                  >
+                    <SwapIcon />
+                  </button>
+                  <span className="swap-label">交换</span>
+                </div>
+
+                <LanguagePanel
+                  side="right"
+                  language={rightLanguage}
+                  value={rightText}
+                  isActive={activeSide === 'right'}
+                  isSourceTranslating={isTranslating && statusSourceSide === 'right'}
+                  showTargetProgress={isTranslating && statusSourceSide === 'left'}
+                  copied={copiedSide === 'right'}
+                  onTextChange={(value) => handleTextChange('right', value)}
+                  onCopy={() => void handleCopy('right')}
+                />
+              </div>
+
+              <div className="translator-status" aria-live="polite">
+                <div className="status-message">
+                  <span className={`status-dot ${isTranslating ? 'is-pulsing' : ''}`} />
+                  {translationStatus.state === 'error' ? (
+                    <span className="error-message">{translationStatus.message}</span>
+                  ) : isTranslating ? (
+                    <span>
+                      正在将{sourceLanguage.label}翻译为{targetLanguage.label}…
+                    </span>
+                  ) : (
+                    <span>两侧都可输入，约 0.5 秒后自动翻译</span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className="clear-button"
+                  onClick={handleClear}
+                  disabled={!leftText && !rightText}
+                >
+                  <TrashIcon />
+                  清空全部
+                </button>
+              </div>
             </div>
-            <button
-              type="button"
-              className="clear-button"
-              onClick={handleClear}
-              disabled={!leftText && !rightText}
-            >
-              <TrashIcon />
-              清空全部
-            </button>
-          </div>
-        </div>
+          </>
+        )}
 
         <p className="service-note">
           翻译由{' '}
-          <a href="https://mymemory.translated.net/doc/spec.php" target="_blank" rel="noreferrer">
-            MyMemory
+          <a href="https://translate.google.com/" target="_blank" rel="noreferrer">
+            Google Translate
           </a>{' '}
           提供。输入内容会发送给该服务处理，请勿输入敏感信息。
         </p>

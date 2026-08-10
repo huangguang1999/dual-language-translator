@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getUtf8ByteLength, trimToUtf8ByteLimit } from './translation'
+import { getUtf8ByteLength, parseTranslationResponse, trimToUtf8ByteLimit } from './translation'
 
 describe('translation text limits', () => {
   it('counts UTF-8 bytes for Latin and Chinese text', () => {
@@ -14,5 +14,27 @@ describe('translation text limits', () => {
 
   it('returns short text unchanged', () => {
     expect(trimToUtf8ByteLimit('short', 500)).toBe('short')
+  })
+})
+
+describe('translation response parsing', () => {
+  it('joins all translated text segments', () => {
+    expect(
+      parseTranslationResponse([
+        [
+          ['This is ', '这是', null],
+          ['a test.', '一个测试。', null],
+        ],
+        null,
+        'zh-CN',
+      ]),
+    ).toBe('This is a test.')
+  })
+
+  it('rejects malformed responses', () => {
+    expect(() => parseTranslationResponse({ translatedText: 'invalid shape' })).toThrow(
+      '翻译服务返回了无法识别的数据。',
+    )
+    expect(() => parseTranslationResponse([[]])).toThrow('翻译服务没有返回翻译结果。')
   })
 })
